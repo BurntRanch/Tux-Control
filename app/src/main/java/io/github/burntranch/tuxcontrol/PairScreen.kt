@@ -59,7 +59,7 @@ data class DeviceListState(
     var deviceList: List<Pair<InetAddress, Int>>? = null
 )
 
-var nsdManager: NsdManager? = null
+var nsd_manager: NsdManager? = null
 
 @RequiresExtension(extension = Build.VERSION_CODES.TIRAMISU, version = 7)
 class DeviceListViewModel : ViewModel() {
@@ -81,17 +81,17 @@ class DeviceListViewModel : ViewModel() {
 
     @RequiresExtension(extension = Build.VERSION_CODES.TIRAMISU, version = 7)
     suspend fun getDevices(): MutableList<Pair<InetAddress, Int>>? {
-        if (nsdManager == null) {
+        if (nsd_manager == null) {
             return null;
         }
 
-        val discover: NsdDiscover = NsdDiscover(nsdManager!!);
+        val discover: NsdDiscover = NsdDiscover(nsd_manager!!);
 
-        nsdManager!!.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, discover.discoveryListener)
+        nsd_manager!!.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, discover.discoveryListener)
 
         delay(3 * 1000)
 
-        nsdManager!!.stopServiceDiscovery(discover.discoveryListener)
+        nsd_manager!!.stopServiceDiscovery(discover.discoveryListener)
 
         val hostAddresses: MutableList<Pair<InetAddress, Int>> = mutableListOf()
 
@@ -105,7 +105,7 @@ class DeviceListViewModel : ViewModel() {
 
 @RequiresExtension(extension = Build.VERSION_CODES.TIRAMISU, version = 7)
 @Composable
-fun PairScreen(modifier: Modifier = Modifier, viewModel: DeviceListViewModel = viewModel()) {
+fun PairScreen(modifier: Modifier = Modifier, onConnect: (Pair<InetAddress, Int>) -> Unit, viewModel: DeviceListViewModel = viewModel()) {
     Column (modifier = modifier) {
         Column (modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
             val deviceListState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -125,7 +125,8 @@ fun PairScreen(modifier: Modifier = Modifier, viewModel: DeviceListViewModel = v
                             text = "Connect",
                             modifier = modifier.clickable(
                                 enabled = true,
-                                onClick = { exitProcess(1) })
+                                onClick = { onConnect(device) }
+                            )
                         )
                     }
                 }
@@ -138,11 +139,11 @@ fun PairScreen(modifier: Modifier = Modifier, viewModel: DeviceListViewModel = v
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PairScreenApp(modifier: Modifier = Modifier, nsd_manager: NsdManager? = null, nav_controller: NavController? = null) {
+fun PairScreenApp(modifier: Modifier = Modifier, nsdManager: NsdManager, navController: NavController) {
     val containerColor = if (isSystemInDarkTheme()) { Color(50, 50, 50) } else { Color(205, 205, 205) }
     val titleColor = if (isSystemInDarkTheme()) { Color(205, 205, 205) } else { Color(50, 50, 50) }
 
-    nsdManager = nsd_manager
+    nsd_manager = nsdManager
 
     Scaffold (topBar = {
         MediumTopAppBar(
@@ -151,18 +152,21 @@ fun PairScreenApp(modifier: Modifier = Modifier, nsd_manager: NsdManager? = null
                 Text("Pairing")
             },
             navigationIcon = {
-                if (nav_controller != null) {
-                    IconButton(onClick = { nav_controller.popBackStack() }) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Go back"
-                        )
-                    }
+                IconButton(onClick = { navController.popBackStack() }) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Go back"
+                    )
                 }
             }
         )
     }, modifier = modifier.fillMaxSize()) {_ ->
-        PairScreen(modifier, DeviceListViewModel());
+        PairScreen(modifier = modifier,
+            onConnect = { device ->
+                            selectedDevice = device
+                            navController.navigate(TuxControlScreen.Device.name)
+                        },
+            viewModel = DeviceListViewModel());
     }
 }
 
@@ -171,6 +175,6 @@ fun PairScreenApp(modifier: Modifier = Modifier, nsd_manager: NsdManager? = null
 @Composable
 fun PairScreenPreview() {
     TuxControlTheme {
-        PairScreen()
+        PairScreen(onConnect = {})
     }
 }
